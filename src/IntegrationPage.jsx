@@ -15,6 +15,10 @@ function IntegrationPage() {
   const [apiOutput, setApiOutput] = useState(null);
   const [apiLoading, setApiLoading] = useState(false);
 
+  const [apiOutput2, setApiOutput2] = useState(null);
+  const [apiLoading2, setApiLoading2] = useState(false);
+  const [error2, setError2] = useState(null);
+
   const nylasConnect = useMemo(
     () =>
       new NylasConnect({
@@ -116,6 +120,41 @@ function IntegrationPage() {
     }
   };
 
+  const handleTestNylasApiUsingAuth0AccessToken = async () => {
+    setApiLoading2(true);
+    setError2(null);
+    setApiOutput2(null);
+    try {
+      const token = await getAccessTokenSilently();
+      // Parse user ID from JWT
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const userId = payload.sub;
+
+      const res = await fetch(
+        `${nylasApiUrl}/v3/grants/${session.grantId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.accessToken}`,
+            'X-Nylas-External-User-Id': userId,
+          },
+        }
+      );
+      const text = await res.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = { raw: text };
+      }
+      setApiOutput2({ status: res.status, statusText: res.statusText, data });
+    } catch (err) {
+      setError2(err?.message ?? "Nylas API call failed");
+      setApiOutput2({ error: err?.message ?? String(err) });
+    } finally {
+      setApiLoading2(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="integration-page">
@@ -136,6 +175,7 @@ function IntegrationPage() {
         </p>
 
         {error && <p className="error-msg">{error}</p>}
+        {error2 && <p className="error-msg">{error2}</p>}
 
         {session ? (
           <div className="integration-status-wrap">
@@ -159,11 +199,26 @@ function IntegrationPage() {
                 onClick={handleTestNylasApi}
                 disabled={apiLoading}
               >
-                {apiLoading ? "Calling…" : "Test Nylas API"}
+                {apiLoading ? "Calling…" : "Test Nylas API using Nylas Session Access Token"}
               </button>
               {apiOutput && (
                 <pre className="api-output">
                   {JSON.stringify(apiOutput, null, 2)}
+                </pre>
+              )}
+            </div>
+            <div className="integration-api-test">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleTestNylasApiUsingAuth0AccessToken}
+                disabled={apiLoading2}
+              >
+                {apiLoading2 ? "Calling…" : "Test Nylas API using Auth0 Access Token"}
+              </button>
+              {apiOutput2 && (
+                <pre className="api-output">
+                  {JSON.stringify(apiOutput2, null, 2)}
                 </pre>
               )}
             </div>
